@@ -11,7 +11,7 @@
         .hero-gradient { background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%); }
         .m5-text { background: linear-gradient(135deg, #fff 0%, #888 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .progress-glow { box-shadow: 0 0 20px rgba(255, 255, 255, 0.2); }
-        .transition-all { transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        .transition-all { transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
     </style>
 </head>
 <body class="hero-gradient min-h-screen flex items-center justify-center p-4">
@@ -36,7 +36,7 @@
         <div class="mt-16 pt-8 border-t border-white/10">
             <div class="flex justify-between text-sm mb-4 text-gray-500 uppercase tracking-widest font-semibold">
                 <span>Community Progress</span>
-                <span id="vote-count-text">0 / 100 Votes</span>
+                <span id="vote-count-text">... / 100 Votes</span>
             </div>
             <div class="w-full bg-white/10 h-4 rounded-full overflow-hidden">
                 <div id="progress-bar" class="bg-white h-full transition-all progress-glow" style="width: 0%"></div>
@@ -58,17 +58,29 @@
         const countText = document.getElementById('vote-count-text');
         const progressBar = document.getElementById('progress-bar');
 
-        let isVoting = false;
+        let isRegisteringVote = false;
+        let lastSeenVotes = 0;
 
         async function fetchGlobalVotes() {
             try {
-                // cache_bust ensures we get the freshest data from kvdb.io
-                const response = await fetch(`${API_URL}?cache_bust=${Date.now()}`);
-                if (!response.ok) return 0;
+                // Aggressive cache busting: dynamic timestamp + no-store policy
+                const response = await fetch(`${API_URL}?nocache=${Date.now()}`, {
+                    cache: 'no-store',
+                    headers: { 
+                        'Cache-Control': 'no-cache', 
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                });
+                
+                if (response.status === 404) return 0;
+                if (!response.ok) throw new Error('Network response not ok');
+                
                 const text = await response.text();
-                return parseInt(text) || 0;
+                const votes = parseInt(text.trim()) || 0;
+                return votes;
             } catch (e) {
-                console.warn("Polling error", e);
+                console.warn("Real-time sync error:", e);
                 return null;
             }
         }
@@ -77,21 +89,31 @@
             try {
                 const current = await fetchGlobalVotes();
                 const next = (current || 0) + 1;
+                
                 const response = await fetch(API_URL, {
                     method: 'POST',
-                    body: next.toString()
+                    body: next.toString(),
+                    headers: { 'Content-Type': 'text/plain' }
                 });
-                return response.ok ? next : null;
+                
+                if (!response.ok) throw new Error('Post failed');
+                return next;
             } catch (e) {
-                console.error("Failed to register vote", e);
+                console.error("Failed to register vote:", e);
                 return null;
             }
         }
 
         function updateUI(votes) {
-            if (votes === null) return;
-            countText.innerText = `${votes} / ${GOAL} Votes`;
-            progressBar.style.width = `${Math.min((votes / GOAL) * 100, 100)}%`;
+            if (votes === null || votes === undefined) return;
+            
+            if (votes !== lastSeenVotes) {
+                lastSeenVotes = votes;
+                countText.innerText = `${votes} / ${GOAL} Votes`;
+                const percent = Math.min((votes / GOAL) * 100, 100);
+                progressBar.style.width = `${percent}%`;
+                console.log(`Live Update: ${votes} votes recorded.`);
+            }
             
             if (localStorage.getItem('ben_voted_global')) {
                 votingPanel.classList.add('hidden');
@@ -100,8 +122,8 @@
         }
 
         voteBtn.addEventListener('click', async () => {
-            if (!localStorage.getItem('ben_voted_global') && !isVoting) {
-                isVoting = true;
+            if (!localStorage.getItem('ben_voted_global') && !isRegisteringVote) {
+                isRegisteringVote = true;
                 voteBtn.disabled = true;
                 voteBtn.innerText = "RECORDING...";
                 
@@ -118,21 +140,21 @@
                 } else {
                     voteBtn.disabled = false;
                     voteBtn.innerText = "YES";
-                    isVoting = false;
+                    isRegisteringVote = false;
                 }
             }
         });
 
-        // Initial load
+        // Initial fetch
         fetchGlobalVotes().then(updateUI);
 
-        // Real-time synchronization: Short-polling every 3 seconds
+        // Real-time Poll: Refresh UI every 2 seconds
         setInterval(async () => {
-            if (!isVoting) {
+            if (!isRegisteringVote) {
                 const votes = await fetchGlobalVotes();
                 updateUI(votes);
             }
-        }, 3000);
+        }, 2000);
     </script>
 </body>
 </html>
