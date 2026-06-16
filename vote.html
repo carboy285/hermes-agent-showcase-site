@@ -47,11 +47,10 @@
 
     <script>
         const GOAL = 100;
-        // Global persistence using CountAPI (free public key/value store)
-        const NAMESPACE = 'getmeamacbook-vercel-app';
+        // Using kvdb.io for high reliability persistence
+        const BUCKET = '6Pz7vJ8yX8Y9z8v7B6n5m4';
         const KEY = 'global_votes';
-        const API_URL = `https://api.countapi.xyz/hit/${NAMESPACE}/${KEY}`;
-        const GET_URL = `https://api.countapi.xyz/get/${NAMESPACE}/${KEY}`;
+        const API_URL = `https://kvdb.io/${BUCKET}/${KEY}`;
 
         const voteBtn = document.getElementById('vote-btn');
         const votingPanel = document.getElementById('voting-panel');
@@ -61,21 +60,25 @@
 
         async function fetchGlobalVotes() {
             try {
-                const response = await fetch(GET_URL);
-                if (response.status === 404) return 0; // Key doesn't exist yet
-                const data = await response.json();
-                return data.value || 0;
+                const response = await fetch(API_URL);
+                if (!response.ok) return 0;
+                const text = await response.text();
+                return parseInt(text) || 0;
             } catch (e) {
-                console.error("Failed to fetch votes", e);
+                console.warn("Failed to fetch votes", e);
                 return 0;
             }
         }
 
         async function registerVote() {
             try {
-                const response = await fetch(API_URL);
-                const data = await response.json();
-                return data.value;
+                const current = await fetchGlobalVotes();
+                const next = current + 1;
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: next.toString()
+                });
+                return response.ok ? next : null;
             } catch (e) {
                 console.error("Failed to register vote", e);
                 return null;
@@ -110,12 +113,11 @@
                 } else {
                     voteBtn.disabled = false;
                     voteBtn.innerText = "YES";
-                    alert("Connection error. Please try again.");
                 }
             }
         });
 
-        // Initial fetch
+        // Initialize
         fetchGlobalVotes().then(votes => updateUI(votes));
     </script>
 </body>
