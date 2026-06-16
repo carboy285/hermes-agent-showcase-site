@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The People Have Spoken | Vote for Ben</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #000; color: #fff; }
+        .hero-gradient { background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%); }
+        .m5-text { background: linear-gradient(135deg, #fff 0%, #888 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .progress-glow { box-shadow: 0 0 20px rgba(255, 255, 255, 0.2); }
+    </style>
+</head>
+<body class="hero-gradient min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-xl w-full bg-white/5 border border-white/10 rounded-[3rem] p-12 text-center backdrop-blur-xl">
+        <h1 class="text-4xl font-extrabold mb-8 m5-text leading-tight">Help Ben Get The MacBook He Deserves</h1>
+        
+        <div id="voting-panel">
+            <p class="text-gray-400 mb-12 text-lg">Should Ben be equipped with an M5 MacBook Air for the good of the developer community?</p>
+            
+            <button id="vote-btn" class="w-full bg-white text-black py-6 rounded-full text-2xl font-black hover:scale-105 active:scale-95 transition transform">
+                YES
+            </button>
+            <p class="mt-4 text-xs text-gray-600 uppercase tracking-widest">Public consensus is near-unanimous</p>
+        </div>
+
+        <div id="thanks-panel" class="hidden">
+            <div class="text-6xl mb-6">✅</div>
+            <h2 class="text-3xl font-bold mb-4">Vote Recorded!</h2>
+            <p class="text-gray-400 mb-8">Thank you for supporting Ben's productivity and sleepmaxxing journey.</p>
+        </div>
+
+        <div class="mt-16 pt-8 border-t border-white/10">
+            <div class="flex justify-between text-sm mb-4 text-gray-500 uppercase tracking-widest font-semibold">
+                <span>Community Progress</span>
+                <span id="vote-count-text">92 / 100 Votes</span>
+            </div>
+            <div class="w-full bg-white/10 h-4 rounded-full overflow-hidden">
+                <div id="progress-bar" class="bg-white h-full transition-all duration-1000 ease-out progress-glow" style="width: 92%"></div>
+            </div>
+            <p class="mt-6 text-sm text-gray-500 italic">"The logic is undeniable." — The Internet</p>
+            <a href="/" class="inline-block mt-8 text-gray-400 hover:text-white transition text-sm">← Back to Business Case</a>
+        </div>
+    </div>
+
+    <script>
+        const GOAL = 100;
+        const BASE_VOTES = 92;
+        const voteBtn = document.getElementById('vote-btn');
+        const votingPanel = document.getElementById('voting-panel');
+        const thanksPanel = document.getElementById('thanks-panel');
+        const countText = document.getElementById('vote-count-text');
+        const progressBar = document.getElementById('progress-bar');
+
+        // Simple persistence using localStorage
+        const hasVoted = localStorage.getItem('ben_voted');
+        let currentVotes = parseInt(localStorage.getItem('ben_vote_total')) || BASE_VOTES;
+
+        function updateUI() {
+            countText.innerText = `${currentVotes} / ${GOAL} Votes`;
+            progressBar.style.width = `${(currentVotes / GOAL) * 100}%`;
+            
+            if (hasVoted) {
+                votingPanel.classList.add('hidden');
+                thanksPanel.classList.remove('hidden');
+            }
+        }
+
+        voteBtn.addEventListener('click', () => {
+            if (!hasVoted) {
+                currentVotes++;
+                localStorage.setItem('ben_voted', 'true');
+                localStorage.setItem('ben_vote_total', currentVotes);
+                updateUI();
+                
+                // Trigger celebratory scale
+                voteBtn.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    votingPanel.classList.add('opacity-0');
+                    setTimeout(() => {
+                        votingPanel.classList.add('hidden');
+                        thanksPanel.classList.remove('hidden');
+                        thanksPanel.classList.add('animate-bounce');
+                    }, 300);
+                }, 150);
+            }
+        });
+
+        updateUI();
+    </script>
+</body>
+</html>
