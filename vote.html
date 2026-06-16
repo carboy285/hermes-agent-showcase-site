@@ -20,7 +20,7 @@
         <div id="voting-panel">
             <p class="text-gray-400 mb-12 text-lg">Should Ben be equipped with an M5 MacBook Air for the good of the developer community?</p>
             
-            <button id="vote-btn" class="w-full bg-white text-black py-6 rounded-full text-2xl font-black hover:scale-105 active:scale-95 transition transform">
+            <button id="vote-btn" class="w-full bg-white text-black py-6 rounded-full text-2xl font-black hover:scale-105 active:scale-95 transition transform disabled:opacity-50 disabled:cursor-not-allowed">
                 YES
             </button>
             <p class="mt-4 text-xs text-gray-600 uppercase tracking-widest">Public consensus is near-unanimous</p>
@@ -35,10 +35,10 @@
         <div class="mt-16 pt-8 border-t border-white/10">
             <div class="flex justify-between text-sm mb-4 text-gray-500 uppercase tracking-widest font-semibold">
                 <span>Community Progress</span>
-                <span id="vote-count-text">92 / 100 Votes</span>
+                <span id="vote-count-text">0 / 100 Votes</span>
             </div>
             <div class="w-full bg-white/10 h-4 rounded-full overflow-hidden">
-                <div id="progress-bar" class="bg-white h-full transition-all duration-1000 ease-out progress-glow" style="width: 92%"></div>
+                <div id="progress-bar" class="bg-white h-full transition-all duration-1000 ease-out progress-glow" style="width: 0%"></div>
             </div>
             <p class="mt-6 text-sm text-gray-500 italic">"The logic is undeniable." — The Internet</p>
             <a href="/" class="inline-block mt-8 text-gray-400 hover:text-white transition text-sm">← Back to Business Case</a>
@@ -47,48 +47,76 @@
 
     <script>
         const GOAL = 100;
-        const BASE_VOTES = 92;
+        // Global persistence using CountAPI (free public key/value store)
+        const NAMESPACE = 'getmeamacbook-vercel-app';
+        const KEY = 'global_votes';
+        const API_URL = `https://api.countapi.xyz/hit/${NAMESPACE}/${KEY}`;
+        const GET_URL = `https://api.countapi.xyz/get/${NAMESPACE}/${KEY}`;
+
         const voteBtn = document.getElementById('vote-btn');
         const votingPanel = document.getElementById('voting-panel');
         const thanksPanel = document.getElementById('thanks-panel');
         const countText = document.getElementById('vote-count-text');
         const progressBar = document.getElementById('progress-bar');
 
-        // Simple persistence using localStorage
-        const hasVoted = localStorage.getItem('ben_voted');
-        let currentVotes = parseInt(localStorage.getItem('ben_vote_total')) || BASE_VOTES;
+        async function fetchGlobalVotes() {
+            try {
+                const response = await fetch(GET_URL);
+                if (response.status === 404) return 0; // Key doesn't exist yet
+                const data = await response.json();
+                return data.value || 0;
+            } catch (e) {
+                console.error("Failed to fetch votes", e);
+                return 0;
+            }
+        }
 
-        function updateUI() {
-            countText.innerText = `${currentVotes} / ${GOAL} Votes`;
-            progressBar.style.width = `${(currentVotes / GOAL) * 100}%`;
+        async function registerVote() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                return data.value;
+            } catch (e) {
+                console.error("Failed to register vote", e);
+                return null;
+            }
+        }
+
+        function updateUI(votes) {
+            countText.innerText = `${votes} / ${GOAL} Votes`;
+            progressBar.style.width = `${Math.min((votes / GOAL) * 100, 100)}%`;
             
-            if (hasVoted) {
+            if (localStorage.getItem('ben_voted_global')) {
                 votingPanel.classList.add('hidden');
                 thanksPanel.classList.remove('hidden');
             }
         }
 
-        voteBtn.addEventListener('click', () => {
-            if (!hasVoted) {
-                currentVotes++;
-                localStorage.setItem('ben_voted', 'true');
-                localStorage.setItem('ben_vote_total', currentVotes);
-                updateUI();
+        voteBtn.addEventListener('click', async () => {
+            if (!localStorage.getItem('ben_voted_global')) {
+                voteBtn.disabled = true;
+                voteBtn.innerText = "RECORDING...";
                 
-                // Trigger celebratory scale
-                voteBtn.style.transform = 'scale(0.95)';
-                setTimeout(() => {
+                const newTotal = await registerVote();
+                if (newTotal !== null) {
+                    localStorage.setItem('ben_voted_global', 'true');
+                    updateUI(newTotal);
+                    
                     votingPanel.classList.add('opacity-0');
                     setTimeout(() => {
                         votingPanel.classList.add('hidden');
                         thanksPanel.classList.remove('hidden');
-                        thanksPanel.classList.add('animate-bounce');
                     }, 300);
-                }, 150);
+                } else {
+                    voteBtn.disabled = false;
+                    voteBtn.innerText = "YES";
+                    alert("Connection error. Please try again.");
+                }
             }
         });
 
-        updateUI();
+        // Initial fetch
+        fetchGlobalVotes().then(votes => updateUI(votes));
     </script>
 </body>
 </html>
