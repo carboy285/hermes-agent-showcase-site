@@ -11,6 +11,7 @@
         .hero-gradient { background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%); }
         .m5-text { background: linear-gradient(135deg, #fff 0%, #888 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .progress-glow { box-shadow: 0 0 20px rgba(255, 255, 255, 0.2); }
+        .transition-all { transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
     </style>
 </head>
 <body class="hero-gradient min-h-screen flex items-center justify-center p-4">
@@ -38,7 +39,7 @@
                 <span id="vote-count-text">0 / 100 Votes</span>
             </div>
             <div class="w-full bg-white/10 h-4 rounded-full overflow-hidden">
-                <div id="progress-bar" class="bg-white h-full transition-all duration-1000 ease-out progress-glow" style="width: 0%"></div>
+                <div id="progress-bar" class="bg-white h-full transition-all progress-glow" style="width: 0%"></div>
             </div>
             <p class="mt-6 text-sm text-gray-500 italic">"The logic is undeniable." — The Internet</p>
             <a href="/" class="inline-block mt-8 text-gray-400 hover:text-white transition text-sm">← Back to Business Case</a>
@@ -47,7 +48,6 @@
 
     <script>
         const GOAL = 100;
-        // Using kvdb.io for high reliability persistence
         const BUCKET = '6Pz7vJ8yX8Y9z8v7B6n5m4';
         const KEY = 'global_votes';
         const API_URL = `https://kvdb.io/${BUCKET}/${KEY}`;
@@ -58,22 +58,25 @@
         const countText = document.getElementById('vote-count-text');
         const progressBar = document.getElementById('progress-bar');
 
+        let isVoting = false;
+
         async function fetchGlobalVotes() {
             try {
-                const response = await fetch(API_URL);
+                // cache_bust ensures we get the freshest data from kvdb.io
+                const response = await fetch(`${API_URL}?cache_bust=${Date.now()}`);
                 if (!response.ok) return 0;
                 const text = await response.text();
                 return parseInt(text) || 0;
             } catch (e) {
-                console.warn("Failed to fetch votes", e);
-                return 0;
+                console.warn("Polling error", e);
+                return null;
             }
         }
 
         async function registerVote() {
             try {
                 const current = await fetchGlobalVotes();
-                const next = current + 1;
+                const next = (current || 0) + 1;
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     body: next.toString()
@@ -86,6 +89,7 @@
         }
 
         function updateUI(votes) {
+            if (votes === null) return;
             countText.innerText = `${votes} / ${GOAL} Votes`;
             progressBar.style.width = `${Math.min((votes / GOAL) * 100, 100)}%`;
             
@@ -96,7 +100,8 @@
         }
 
         voteBtn.addEventListener('click', async () => {
-            if (!localStorage.getItem('ben_voted_global')) {
+            if (!localStorage.getItem('ben_voted_global') && !isVoting) {
+                isVoting = true;
                 voteBtn.disabled = true;
                 voteBtn.innerText = "RECORDING...";
                 
@@ -113,12 +118,21 @@
                 } else {
                     voteBtn.disabled = false;
                     voteBtn.innerText = "YES";
+                    isVoting = false;
                 }
             }
         });
 
-        // Initialize
-        fetchGlobalVotes().then(votes => updateUI(votes));
+        // Initial load
+        fetchGlobalVotes().then(updateUI);
+
+        // Real-time synchronization: Short-polling every 3 seconds
+        setInterval(async () => {
+            if (!isVoting) {
+                const votes = await fetchGlobalVotes();
+                updateUI(votes);
+            }
+        }, 3000);
     </script>
 </body>
 </html>
