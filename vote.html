@@ -21,16 +21,10 @@
         <div id="voting-panel">
             <p class="text-gray-400 mb-12 text-lg">Should Ben be equipped with an M5 MacBook Air for the good of the developer community?</p>
             
-            <button id="vote-btn" class="w-full bg-white text-black py-6 rounded-full text-2xl font-black hover:scale-105 active:scale-95 transition transform disabled:opacity-50 disabled:cursor-not-allowed">
+            <a href="https://strawpoll.com/BDyNzmWGwyR" target="_blank" id="vote-btn" class="block w-full bg-white text-black py-6 rounded-full text-2xl font-black hover:scale-105 active:scale-95 transition transform">
                 YES
-            </button>
+            </a>
             <p class="mt-4 text-xs text-gray-600 uppercase tracking-widest">Public consensus is near-unanimous</p>
-        </div>
-
-        <div id="thanks-panel" class="hidden">
-            <div class="text-6xl mb-6">✅</div>
-            <h2 class="text-3xl font-bold mb-4">Vote Recorded!</h2>
-            <p class="text-gray-400 mb-8">Thank you for supporting Ben's productivity and sleepmaxxing journey.</p>
         </div>
 
         <div class="mt-16 pt-8 border-t border-white/10">
@@ -48,52 +42,30 @@
 
     <script>
         const GOAL = 100;
-        // Brand new bucket/v2 to ensure a fresh, synchronized start
         const BUCKET = '6Pz7vJ8yX8Y9z8v7B6n5m4_v2';
         const KEY = 'global_votes';
         const API_URL = `https://kvdb.io/${BUCKET}/${KEY}`;
 
-        const voteBtn = document.getElementById('vote-btn');
-        const votingPanel = document.getElementById('voting-panel');
-        const thanksPanel = document.getElementById('thanks-panel');
         const countText = document.getElementById('vote-count-text');
         const progressBar = document.getElementById('progress-bar');
 
-        let isRegisteringVote = false;
         let lastSeenVotes = 0;
 
         async function fetchGlobalVotes() {
             try {
                 const response = await fetch(`${API_URL}?nocache=${Date.now()}`, {
-                    cache: 'no-store'
+                    cache: 'no-store',
+                    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
                 });
                 
                 if (response.status === 404) return 0;
-                if (!response.ok) throw new Error('HTTP Status ' + response.status);
+                if (!response.ok) throw new Error('Network response was not ok');
                 
                 const text = await response.text();
                 const votes = parseInt(text.trim()) || 0;
                 return votes;
             } catch (e) {
                 console.warn("Real-time sync error:", e);
-                return null;
-            }
-        }
-
-        async function registerVote() {
-            try {
-                // Atomic increment supported by kvdb.io (POST +1)
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    body: '+1',
-                    headers: { 'Content-Type': 'text/plain' }
-                });
-                
-                if (!response.ok) throw new Error('Post failed');
-                const text = await response.text();
-                return parseInt(text.trim());
-            } catch (e) {
-                console.error("Failed to register vote:", e);
                 return null;
             }
         }
@@ -107,46 +79,15 @@
                 const percent = Math.min((votes / GOAL) * 100, 100);
                 progressBar.style.width = `${percent}%`;
             }
-            
-            if (localStorage.getItem('ben_voted_global_v2')) {
-                votingPanel.classList.add('hidden');
-                thanksPanel.classList.remove('hidden');
-            }
         }
 
-        voteBtn.addEventListener('click', async () => {
-            if (!localStorage.getItem('ben_voted_global_v2') && !isRegisteringVote) {
-                isRegisteringVote = true;
-                voteBtn.disabled = true;
-                voteBtn.innerText = "RECORDING...";
-                
-                const newTotal = await registerVote();
-                if (newTotal !== null) {
-                    localStorage.setItem('ben_voted_global_v2', 'true');
-                    updateUI(newTotal);
-                    
-                    votingPanel.classList.add('opacity-0');
-                    setTimeout(() => {
-                        votingPanel.classList.add('hidden');
-                        thanksPanel.classList.remove('hidden');
-                    }, 300);
-                } else {
-                    voteBtn.disabled = false;
-                    voteBtn.innerText = "YES";
-                    isRegisteringVote = false;
-                }
-            }
-        });
-
-        // Initial fetch
+        // Initial Load
         fetchGlobalVotes().then(updateUI);
 
         // Real-time Poll: Aggressive refresh every 2 seconds
         setInterval(async () => {
-            if (!isRegisteringVote) {
-                const votes = await fetchGlobalVotes();
-                updateUI(votes);
-            }
+            const votes = await fetchGlobalVotes();
+            updateUI(votes);
         }, 2000);
     </script>
 </body>
