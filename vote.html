@@ -42,10 +42,6 @@
 
     <script>
         const GOAL = 100;
-        const BUCKET = '6Pz7vJ8yX8Y9z8v7B6n5m4_v2';
-        const KEY = 'global_votes';
-        const API_URL = `https://kvdb.io/${BUCKET}/${KEY}`;
-
         const countText = document.getElementById('vote-count-text');
         const progressBar = document.getElementById('progress-bar');
 
@@ -53,19 +49,17 @@
 
         async function fetchGlobalVotes() {
             try {
-                const response = await fetch(`${API_URL}?nocache=${Date.now()}`, {
-                    cache: 'no-store',
-                    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+                // Fetch from the static JSON file on the same host
+                const response = await fetch('/votes.json?nocache=' + Date.now(), {
+                    cache: 'no-store'
                 });
                 
-                if (response.status === 404) return 0;
-                if (!response.ok) throw new Error('Network response was not ok');
+                if (!response.ok) return null;
                 
-                const text = await response.text();
-                const votes = parseInt(text.trim()) || 0;
-                return votes;
+                const data = await response.json();
+                return data.total || 0;
             } catch (e) {
-                console.warn("Real-time sync error:", e);
+                console.warn("Sync error:", e);
                 return null;
             }
         }
@@ -75,20 +69,20 @@
             
             if (votes !== lastSeenVotes) {
                 lastSeenVotes = votes;
-                countText.innerText = `${votes} / ${GOAL} Votes`;
+                countText.innerText = votes + " / " + GOAL + " Votes";
                 const percent = Math.min((votes / GOAL) * 100, 100);
-                progressBar.style.width = `${percent}%`;
+                progressBar.style.width = percent + "%";
             }
         }
 
         // Initial Load
         fetchGlobalVotes().then(updateUI);
 
-        // Real-time Poll: Aggressive refresh every 2 seconds
+        // Refresh UI every 30 seconds
         setInterval(async () => {
             const votes = await fetchGlobalVotes();
             updateUI(votes);
-        }, 2000);
+        }, 30000);
     </script>
 </body>
 </html>
